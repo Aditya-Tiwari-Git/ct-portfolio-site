@@ -6,15 +6,3 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 SITE_URL = "https://consultixtech.com"
 AI_PROVIDER = "openai"
-
-[[unsafe.bindings]]
-name = "CHAT_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 12, period = 60 }
-
-[[unsafe.bindings]]
-name = "CONTACT_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1002"
-simple = { limit = 3, period = 60 }

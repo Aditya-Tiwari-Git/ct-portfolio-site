@@ -27,9 +27,10 @@ export async function rateLimit(request: Request, env: Env, kind: 'chat' | 'cont
     try { const result = await binding.limit({ key }); return result.success ? null : json({ error: 'Too many requests. Please wait a minute and try again.' }, 429, { 'Retry-After': '60' }); }
     catch { return json({ error: 'This service is temporarily unavailable. Please contact our team.' }, 503); }
   }
-  // Never silently use an isolate-local limiter in production. Require the Cloudflare binding.
+  // Native rate-limit bindings are optional and are not declared in the Pages config.
+  // Local memory is useful for development, but is not a distributed production limiter.
   const hostname = new URL(request.url).hostname;
-  if (env.ALLOW_LOCAL_RATE_LIMIT !== 'true' || !['localhost', '127.0.0.1', '[::1]'].includes(hostname)) return json({ error: 'This service is temporarily unavailable. Please contact our team.' }, 503);
+  if (env.ALLOW_LOCAL_RATE_LIMIT !== 'true' || !['localhost', '127.0.0.1', '[::1]'].includes(hostname)) return null;
   const now = Date.now(); for (const [id, bucket] of localBuckets) if (bucket.reset <= now) localBuckets.delete(id);
   const bucket = localBuckets.get(key) ?? { count: 0, reset: now + 60000 };
   bucket.count++; localBuckets.set(key, bucket);

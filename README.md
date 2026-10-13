@@ -32,7 +32,7 @@ npm.cmd run dev:full
 | Variable | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Server-only OpenAI credential. Put in `.dev.vars` locally and encrypted Cloudflare secret in production. |
-| `OPENAI_MODEL` | Model available to your OpenAI account that supports the Responses API. Required; no model is hardcoded. |
+| `OPENAI_MODEL` | Model available to your OpenAI account that supports the Responses API. Required; no model is hardcoded. Set it as a Pages runtime secret/environment binding in Cloudflare (see deployment steps). |
 | `AI_PROVIDER` | `openai`; provider dispatch lives in `server/provider.ts`. Add an adapter there to support another provider. |
 | `SITE_URL` | Canonical build URL; defaults to `https://consultixtech.com`. Set the same URL for build and runtime. |
 | `CONTACT_EMAIL` | Your approved **public** business email. Put in `.env` and rebuild to publish it. Put in `.dev.vars` / production environment to serve it dynamically. This value is intentionally public; use a business contact address. |
@@ -41,13 +41,13 @@ npm.cmd run dev:full
 | `WHATSAPP_NUMBER` | Runtime public WhatsApp number, digits only; defaults to 918447844097. |
 | `CONTACT_WEBHOOK_URL` | Optional HTTPS enquiry delivery endpoint. Store as a server secret. |
 | `CONTACT_WEBHOOK_TOKEN` | Optional bearer credential for delivery endpoint. Store as a server secret. |
-| `ALLOW_LOCAL_RATE_LIMIT` | `true` permits an in-memory limiter **only on localhost** if native bindings are unavailable. Never substitutes for production limits. |
+| `ALLOW_LOCAL_RATE_LIMIT` | `true` enables an optional in-memory limiter **only on localhost**. It has no effect on production enforcement; missing production bindings do not block either API. |
 
 The homepage/footer and pre-rendered schema use approved contacts in `src/data/contact.ts`. If phone numbers change, update this file as well as runtime overrides and rebuild. `.env` alone does not configure a deployed server or send email. `CONTACT_EMAIL` displays an address; configure the webhook below for form delivery.
 
 ## Contact form delivery
 
-The form validates name, email, company, service, requirements, contact preference and consent. Phone is required when the preferred channel is Phone or WhatsApp. Server validation adds field size limits, a honeypot, same-origin checks and rate limiting.
+The form validates name, email, company, service, requirements, contact preference and consent. Phone is required when the preferred channel is Phone or WhatsApp. Server validation adds field size limits, a honeypot, same-origin checks and optional rate limiting.
 
 Configure a trusted HTTPS endpoint in `CONTACT_WEBHOOK_URL` that accepts JSON and returns a 2xx status **after accepting delivery**. It can be your CRM, an automation workflow or your own email service adapter. Optional `CONTACT_WEBHOOK_TOKEN` is sent as a bearer token. Payload:
 
@@ -71,7 +71,7 @@ The frontend reports success only after confirmation. When delivery is unconfigu
 
 ```text
 Visitor → lazy-loaded chat panel → POST /api/chat
-        → same-origin / byte-size / history / rate-limit validation
+        → same-origin / byte-size / history validation + optional rate limiting
         → shared approved content + ranked relevant sections
         → server-only OpenAI Responses API → plain-text reply + source links
 ```
@@ -88,9 +88,17 @@ AI-generated content can be wrong. The chat displays a privacy notice and the si
 
 ## Rate limiting and abuse protection
 
-`wrangler.toml` declares Cloudflare native rate-limit bindings: `CHAT_RATE_LIMITER` (12 requests/IP/minute) and `CONTACT_RATE_LIMITER` (3/IP/minute), using separate namespace IDs. The current Pages runtime accepts them via `unsafe.bindings`; Wrangler labels that configuration surface experimental. Validate that both bindings are present and callable in the target Cloudflare project after deployment. The local Wrangler runtime was tested with these bindings. See [Cloudflare rate limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) and [Pages configuration](https://developers.cloudflare.com/pages/functions/wrangler-configuration/).
+The checked-in Cloudflare Pages configuration contains **no `unsafe` or native limiter bindings**. Rate limiting is optional for this initial low-traffic deployment. If `CHAT_RATE_LIMITER` or `CONTACT_RATE_LIMITER` is absent, `rateLimit()` allows the request to continue; missing bindings do not produce a 503 or prevent chat/contact processing. The shared `Env` interface retains these optional fields for a future limiter adapter. If an explicitly supplied limiter rejects a request, the API returns 429; if that configured service fails, it returns a safe 503.
 
-The server **fails closed with 503** if production bindings are missing or fail; it never relies on process-local memory for production protection. Cloudflare limits are per location and approximate, not a global billing quota. Add a zone-level rate-limiting/WAF rule for `/api/chat` and `/api/contact` if your plan supports it, and configure OpenAI project spending limits. A distributed attacker can use multiple IPs. If your Pages project cannot deploy the experimental bindings, use a Worker with native `ratelimits` bindings or attach a supported rate-limiter service adapter; do not simply disable protection.
+For local development, `ALLOW_LOCAL_RATE_LIMIT=true` activates the existing in-memory limits (12 chat requests/IP/minute, 3 contact requests/IP/minute) only on localhost. Production does not silently use isolate-local memory as distributed protection. **Without a production upgrade, there is no application-level rate enforcement on the deployed Pages APIs.** Same-origin restrictions, JSON validation, streaming byte-size limits, message/history limits, contact consent/honeypot checks, provider timeout and safe errors remain in place.
+
+Recommended production upgrades:
+
+1. Add Cloudflare zone-level WAF/rate-limiting rules targeting POST requests to `/api/chat` and `/api/contact`, with limits appropriate for your expected traffic and available plan. Those rules apply to traffic through the configured zone; separately restrict or protect the default `*.pages.dev` hostname so it cannot bypass your custom-domain policy.
+2. For enforcement across all hostnames, add a Pages-compatible shared limiter service, backed by a Durable Object in a separate Worker or another distributed store. A plain KV counter is not a strict atomic limiter. Alternatively move the API to a Worker that supports native `ratelimits`; keep credentials server-side and preserve the existing API contracts.
+3. Monitor OpenAI usage and configure available account/project budgets and alerts. A per-IP limiter is not a global spending cap, and distributed clients can use multiple IPs.
+
+Native Worker configuration must not be copied into `wrangler.toml` for Pages. See [Cloudflare rate limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) and [Pages configuration](https://developers.cloudflare.com/pages/functions/wrangler-configuration/).
 
 ## Updating knowledge and content
 
@@ -135,9 +143,9 @@ The build automatically pre-renders pages and scans `dist` for API key patterns,
 1. Create or choose your GitHub repository. Commit the source and lockfile; confirm `.env`, `.dev.vars`, `.npm-cache`, `.wrangler` and credentials are excluded. Push to your chosen branch. No production repository or account was assumed.
 2. In Cloudflare, open Workers & Pages → Create application → Pages → Connect to Git. Authorize the intended GitHub repository.
 3. Configure build command `npm run build`, output directory `dist`, root directory the repository root, and a current Node version (24 recommended). Use the checked-in `wrangler.toml` as the runtime configuration source.
-4. Add non-secret build/runtime values such as `SITE_URL`, `CONTACT_EMAIL`, `OPENAI_MODEL` and `AI_PROVIDER`. Keep preview and production settings separate. The model must be available to your own OpenAI account.
-5. Add encrypted **server secrets** `OPENAI_API_KEY`, and optional `CONTACT_WEBHOOK_URL` / `CONTACT_WEBHOOK_TOKEN`, in Pages project settings → Variables and Secrets. Never use a `VITE_` prefix. Re-deploy after configuration changes.
-6. Deploy and verify the generated `*.pages.dev` URL. Test `/api/chat` from the same origin, enquiry delivery, both rate limits, service deep links, sitemap and actual 404. Ensure callable limiter bindings; missing bindings intentionally disable paid API calls.
+4. `SITE_URL` and `AI_PROVIDER` have configurable defaults in `[vars]` of `wrangler.toml`. Because this file is the Pages configuration source of truth, update those defaults in the file when changing deployment configuration. Set `SITE_URL` and the approved public `CONTACT_EMAIL` in the build environment as needed. Keep preview and production settings separate.
+5. Add encrypted **server secrets** `OPENAI_API_KEY` and `OPENAI_MODEL` in Pages project settings → Variables and Secrets. Although a model ID is not confidential, storing it as a runtime secret binding keeps it configurable in Cloudflare without adding a placeholder to the required Wrangler `[vars]` configuration. The model must be available to your own OpenAI account. Also configure optional `CONTACT_WEBHOOK_URL`, `CONTACT_WEBHOOK_TOKEN` and runtime `CONTACT_EMAIL` as needed. Never use a `VITE_` prefix. Re-deploy after configuration changes; missing key/model still produces the intentional friendly provider-unavailable response.
+6. Deploy and verify the generated `*.pages.dev` URL. Test `/api/chat` from the same origin, enquiry delivery, service deep links, sitemap and actual 404. Limiter bindings are not required. Before increasing traffic, implement the production rate-limiting upgrade above and verify its enforcement.
 7. Connect the custom domain only after the preview is ready. No account credentials, production API keys or DNS modifications are bundled with this project.
 
 For a new local repository, after creating your chosen GitHub repository:
@@ -158,10 +166,11 @@ CLI option for an authenticated Cloudflare account:
 npx wrangler login
 npx wrangler pages project create consultix-technologies
 npx wrangler pages secret put OPENAI_API_KEY --project-name consultix-technologies
+npx wrangler pages secret put OPENAI_MODEL --project-name consultix-technologies
 npm run deploy -- --project-name consultix-technologies
 ```
 
-Set `OPENAI_MODEL` and public environment settings in the dashboard. If using Git integration, create that integration first; project creation mode cannot always be switched later. Pages static hosting and Functions have plan limits. OpenAI API usage is billed separately and is not included in free hosting.
+The secret commands prompt for values; do not put API credentials in command arguments. You can set these secret bindings in the dashboard instead. If using Git integration, create that integration first; project creation mode cannot always be switched later. Pages static hosting and Functions have plan limits. OpenAI API usage is billed separately and is not included in free hosting.
 
 ## GoDaddy domain and DNS
 
@@ -181,9 +190,9 @@ If you keep authoritative DNS outside Cloudflare, subdomain CNAME integration ma
 ## Troubleshooting
 
 - **PowerShell says scripts are disabled:** use `npm.cmd` and `npx.cmd`; no execution-policy change is needed.
-- **Chat unavailable:** verify server secrets, an accessible Responses-compatible model, native limiter bindings and the server runtime. Vite alone cannot run Functions. Do not add browser API keys as a workaround.
+- **Chat unavailable:** verify server secrets, an accessible Responses-compatible model and the server runtime. Native limiter bindings are optional and their absence does not disable the API. Vite alone cannot run Functions. Do not add browser API keys as a workaround.
 - **Chat returns 503 immediately after adding credentials to `.env`:** this project has a `.dev.vars` file, which is the local Cloudflare runtime's server configuration. Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.dev.vars` as well; populating `.env` alone does not populate those bindings. Preserve other existing `.dev.vars` settings, then stop and restart `npm run dev:api` (or `npm run dev:full`). Both credential files are ignored by Git. An immediate configuration failure uses the same safe browser message as other provider failures.
-- **Chat 429:** wait at least a minute. Limits apply across requests from a shared IP.
+- **Chat 429:** an enabled local limiter, optional configured limiter, edge rule or provider limit is rejecting requests. Wait as indicated by `Retry-After`. The initial production Pages deployment has no application-level limiter unless you add one.
 - **Chat 400/413:** check message size/history limits and JSON payload; the UI sends whole alternating pairs.
 - **Email missing:** set `CONTACT_EMAIL` in `.env` and rebuild/restart, or in the Cloudflare runtime environment and redeploy. `.env` is ignored by Git and is not automatically uploaded.
 - **Form offers WhatsApp:** no working delivery endpoint is configured, the endpoint rejected the enquiry, or delivery could not be confirmed. Displaying an email is not an email delivery integration.
