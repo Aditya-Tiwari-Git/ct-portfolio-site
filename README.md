@@ -4,7 +4,7 @@ A complete React + TypeScript + Vite corporate website, with Tailwind CSS, Motio
 
 ## Local development
 
-Use Node.js 22.12+ (Node 24 recommended) and npm. On Windows PowerShell, use `npm.cmd` / `npx.cmd` if execution policy blocks `.ps1` launchers.
+Use Node.js 22.12+ (Node 24 recommended) and npm. The clean install and production build have also been verified with Cloudflare's Node.js 22.16.0 and npm 10.9.2; no Node version override is required for that environment. Commit the checked-in `package-lock.json` and use `npm ci` for reproducible CI/deployment installs. On Windows PowerShell, use `npm.cmd` / `npx.cmd` if execution policy blocks `.ps1` launchers.
 
 ```sh
 npm install
@@ -189,6 +189,7 @@ If you keep authoritative DNS outside Cloudflare, subdomain CNAME integration ma
 
 ## Troubleshooting
 
+- **Cloudflare `npm clean-install` fails with `Invalid Version:`:** the earlier lockfile contained two incomplete optional Rollup records (`node_modules/rollup/node_modules/@rollup/rollup-openbsd-x64` and `node_modules/rollup/node_modules/@rollup/rollup-openharmony-arm64`) with no version or package resolution metadata. npm's Arborist deduplication passed the missing version to semver and failed. The corrected lockfile was regenerated with npm 10.9.2 while preserving existing valid dependency versions. Commit and push the corrected `package-lock.json`; do not omit it, disable optional dependencies, use `--force`, or change Node versions to mask this error. `npm clean-install` is an alias of `npm ci`.
 - **PowerShell says scripts are disabled:** use `npm.cmd` and `npx.cmd`; no execution-policy change is needed.
 - **Chat unavailable:** verify server secrets, an accessible Responses-compatible model and the server runtime. Native limiter bindings are optional and their absence does not disable the API. Vite alone cannot run Functions. Do not add browser API keys as a workaround.
 - **Chat returns 503 immediately after adding credentials to `.env`:** this project has a `.dev.vars` file, which is the local Cloudflare runtime's server configuration. Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.dev.vars` as well; populating `.env` alone does not populate those bindings. Preserve other existing `.dev.vars` settings, then stop and restart `npm run dev:api` (or `npm run dev:full`). Both credential files are ignored by Git. An immediate configuration failure uses the same safe browser message as other provider failures.
