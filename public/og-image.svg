@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <path d="M80 146H1120M80 510H1120" stroke="#dfe3e9"/>
+  <rect x="80" y="88" width="5" height="25" fill="#3498c9"/>
+  <text x="104" y="109" fill="#30334f" font-family="Arial,sans-serif" font-size="25" letter-spacing="1">CONSULTIX TECHNOLOGIES</text>
+  <text x="80" y="256" fill="#30334f" font-family="Arial,sans-serif" font-size="54">Engineering Intelligent</text>
+  <text x="80" y="333" fill="#30334f" font-family="Arial,sans-serif" font-size="54">Solutions for a</text>
+  <text x="80" y="410" fill="#30334f" font-family="Arial,sans-serif" font-size="54">Digital-First World.</text>
+  <text x="80" y="560" fill="#536276" font-family="Arial,sans-serif" font-size="23">AI · Automation · Enterprise Software · Digital Transformation</text>
+</svg>

@@ -1,0 +1,13 @@
+import React from 'react';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import '@fontsource/manrope/latin-400.css';
+import '@fontsource/manrope/latin-500.css';
+import '@fontsource/manrope/latin-600.css';
+import '@fontsource/manrope/latin-700.css';
+import '@fontsource/manrope/latin-800.css';
+import './styles.css';
+import App from './App';
+const root = document.getElementById('root')!;
+const app = <React.StrictMode><BrowserRouter><App/></BrowserRouter></React.StrictMode>;
+if (root.hasChildNodes() && root.querySelector('main')) hydrateRoot(root, app, { onRecoverableError: (error, info) => { console.error(error, info.componentStack); } }); else createRoot(root).render(app);

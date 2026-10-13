@@ -1,0 +1,3 @@
+import { Sparkles, Layers3, Workflow, Code2, ChartNoAxesCombined, Network, BookOpen, Smartphone, Building2, ShoppingBag, Factory, BriefcaseBusiness } from 'lucide-react';
+const icons = { sparkles: Sparkles, layers: Layers3, workflow: Workflow, code: Code2, chart: ChartNoAxesCombined, network: Network, book: BookOpen, phone: Smartphone, building: Building2, shopping: ShoppingBag, factory: Factory, briefcase: BriefcaseBusiness };
+export default function Icon({ name, size = 24 }: { name: string; size?: number }) { const Component = icons[name as keyof typeof icons] ?? Network; return <Component size={size} strokeWidth={1.5} aria-hidden="true"/>; }

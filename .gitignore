@@ -1,0 +1,17 @@
+node_modules/
+.npm-cache/
+.qa/
+dist/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+.wrangler/
+playwright-report/
+test-results/
+*.local
+*.log
+.DS_Store
+.env.local
+.env.*.local
